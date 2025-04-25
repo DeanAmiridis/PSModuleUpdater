@@ -25,7 +25,7 @@ This PowerShell script checks your installed modules (those installed via `Insta
 
 ## ▶️ How to Use
 
-1.  **Save the Script:** Save the PowerShell script code to a file, for example, `Check-AndUpdateModules.ps1`. 💾
+1.  **Save the Script:** Save the PowerShell script code to a file, for example, `PSModuleUpdater.ps1`. 💾
 2.  **Open PowerShell as Administrator:**
     * Right-click the PowerShell icon.
     * Select "Run as administrator".
@@ -35,7 +35,7 @@ This PowerShell script checks your installed modules (those installed via `Insta
     ```
 4.  **Run the Script:** Execute the script.
     ```powershell
-    .\Check-AndUpdateModules.ps1
+    .\PSModuleUpdater.ps1
     ```
 5.  **Review Output:** The script will first display a table comparing all your installed modules to the gallery versions. 📊
 6.  **Confirm Updates (if applicable):** If modules with available updates are found, they will be listed separately, and you will be prompted `(Y/N)` to proceed with updating them.
