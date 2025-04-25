@@ -1,4 +1,4 @@
-# PSModuleUpdater - _Module Update Checker & Updater_ 🚀
+# PSModuleUpdater 🚀
 
 This PowerShell script checks your installed modules (those installed via `Install-Module`) against the official PowerShell Gallery (PSGallery) to identify available updates. It then provides an option to update the outdated modules automatically.
 
