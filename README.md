@@ -66,7 +66,4 @@ If updates are performed, the script will indicate success or failure for each m
 * **Pre-release Versions:** The script specifically looks for the latest *stable* version in the gallery (`Find-Module` default behavior). It won't prompt you to update to a pre-release version unless your installed version is older than the *latest stable* version.
 * **Update Failures:** Individual module updates might fail due to various reasons (permissions, network issues, conflicts). The script attempts to report these errors but will continue trying to update other modules in the list.
 
----
-
-*This README was generated on Friday, April 25, 2025.*
 
