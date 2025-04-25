@@ -2,28 +2,31 @@
 .SYNOPSIS
 Checks installed PowerShell modules against the PowerShell Gallery for available updates,
 displays the comparison, and optionally updates modules flagged as needing an update
-after user confirmation.
+after user confirmation. Handles publisher check failures by offering a retry option.
 
 .DESCRIPTION
 This script performs the following actions:
 1. Retrieves all modules installed via PowerShellGet.
 2. For each module, queries the PowerShell Gallery for the latest stable version.
 3. Compares the installed version with the latest available version.
-4. Displays a table summarizing the comparison results (Name, InstalledVersion, LatestVersion, Status).
+4. Displays a table summarizing the comparison results.
 5. Identifies modules where an update is available.
 6. If updates are available, lists those modules and prompts the user for confirmation (Y/N).
 7. If confirmed, attempts to update each identified module using Update-Module -Force.
-8. Reports success or failure for each update attempt.
+8. If an update fails specifically due to a publisher check, it tracks that module.
+9. After the initial update attempt, if any modules failed the publisher check, it lists them
+   and prompts the user (Y/N) again to retry *those specific modules* using -SkipPublisherCheck.
+10. Reports success or failure for all update attempts.
 
 .NOTES
 - Requires the PowerShellGet module.
-- Run PowerShell as Administrator for best results, especially for updating modules in the 'AllUsers' scope.
+- Run PowerShell as Administrator for best results.
 - Checking many modules against the online gallery can take time.
-- Uses the official 'PSGallery' repository for checks and updates.
+- Uses the official 'PSGallery' repository.
 - Current Date for context: Friday, April 25, 2025.
 
 .EXAMPLE
-.\Check-AndUpdateModules.ps1
+.\PSModuleUpdater.ps1
 #>
 
 # --- Section 1: Check Installed Modules vs Gallery ---
@@ -117,9 +120,12 @@ if ($modulesToUpdate.Count -gt 0) {
     # Prompt user for confirmation to update these specific modules
     $prompt = Read-Host "Do you want to attempt updating these $($modulesToUpdate.Count) module(s) now? (Requires Administrator privileges) (Y/N)"
 
-    # --- Section 3: Perform Updates if Confirmed ---
+    # --- Section 3: Perform Initial Updates if Confirmed ---
     if ($prompt -eq 'Y' -or $prompt -eq 'y') {
-        Write-Host "`nStarting module updates (using Update-Module -Force)..." -ForegroundColor Green
+        Write-Host "`nStarting initial module updates (using Update-Module -Force)..." -ForegroundColor Green
+
+        # Initialize list to track modules failing publisher check
+        $failedPublisherCheckModules = @()
 
         foreach ($moduleInfo in $modulesToUpdate) {
             Write-Host "--> Attempting to update '$($moduleInfo.ModuleName)' from $($moduleInfo.InstalledVersion) to $($moduleInfo.LatestVersion)..."
@@ -128,13 +134,47 @@ if ($modulesToUpdate.Count -gt 0) {
                  Update-Module -Name $moduleInfo.ModuleName -Force -ErrorAction Stop
                  Write-Host "    Successfully updated '$($moduleInfo.ModuleName)'." -ForegroundColor Green
             } catch {
-                # Report error if a specific module update fails
-                Write-Warning "    Failed to update '$($moduleInfo.ModuleName)'. Error: $($_.Exception.Message)"
+                # Check if the error was specifically a Publisher Check failure
+                # The FullyQualifiedErrorId is often 'Modules_PublisherVerificationFailed' or similar
+                # Checking the exception message text provides broader compatibility but might be less precise
+                if ($_.Exception.Message -like "*publisher check failed*" -or $_.FullyQualifiedErrorId -eq 'Modules_PublisherVerificationFailed') {
+                    Write-Warning "    Update failed for '$($moduleInfo.ModuleName)' due to Publisher Check failure. Will prompt later to retry."
+                    # Add to the list for potential retry
+                    $failedPublisherCheckModules += $moduleInfo
+                } else {
+                    # Report other errors if the update fails
+                    Write-Warning "    Failed to update '$($moduleInfo.ModuleName)'. Error: $($_.Exception.Message)"
+                }
             }
         }
-        Write-Host "`nModule update process finished." -ForegroundColor Cyan
+        Write-Host "`nInitial module update attempt finished." -ForegroundColor Cyan
+
+        # --- Section 4: Handle Publisher Check Failures ---
+        if ($failedPublisherCheckModules.Count -gt 0) {
+            Write-Host "`nThe following modules failed the initial update due to a publisher check:" -ForegroundColor Yellow
+            $failedPublisherCheckModules | Select-Object ModuleName, InstalledVersion, LatestVersion | Format-Table -AutoSize
+
+            $retryPrompt = Read-Host "Do you want to retry updating these $($failedPublisherCheckModules.Count) module(s) by skipping the publisher check? (Y/N)"
+
+            if ($retryPrompt -eq 'Y' -or $retryPrompt -eq 'y') {
+                 Write-Host "`nRetrying updates with -SkipPublisherCheck..." -ForegroundColor Green
+                 foreach ($moduleInfoRetry in $failedPublisherCheckModules) {
+                     Write-Host "--> Retrying update for '$($moduleInfoRetry.ModuleName)' (skipping publisher check)..."
+                     try {
+                          Update-Module -Name $moduleInfoRetry.ModuleName -Force -SkipPublisherCheck -ErrorAction Stop
+                          Write-Host "    Successfully updated '$($moduleInfoRetry.ModuleName)' on retry." -ForegroundColor Green
+                     } catch {
+                          Write-Warning "    Retry failed for '$($moduleInfoRetry.ModuleName)'. Error: $($_.Exception.Message)"
+                     }
+                 }
+                 Write-Host "`nRetry update process finished." -ForegroundColor Cyan
+            } else {
+                 Write-Host "`nRetry update process skipped by user." -ForegroundColor Yellow
+            }
+        }
+
     } else {
-        # User chose not to update
+        # User chose not to update initially
         Write-Host "`nUpdate process skipped by user." -ForegroundColor Yellow
     }
 } else {
